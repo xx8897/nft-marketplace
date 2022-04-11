@@ -2,19 +2,14 @@ import { ethers } from 'ethers'
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import Web3Modal from "web3modal"
+import Music from './music'
 
 import {
   nftaddress, nftmarketaddress
 } from '../config'
 
 import NFT from '../artifacts/contracts/NFT.sol/NFT.json'
-import Market from '../artifacts/contracts/Market.sol/NFTMarket.json'
-
-let rpcEndpoint = null
-
-if (process.env.NEXT_PUBLIC_WORKSPACE_URL) {
-  rpcEndpoint = process.env.NEXT_PUBLIC_WORKSPACE_URL
-}
+import Market from '../artifacts/contracts/NFTMarket.sol/NFTMarket.json'
 
 export default function Home() {
   const [nfts, setNfts] = useState([])
@@ -22,22 +17,23 @@ export default function Home() {
   useEffect(() => {
     loadNFTs()
   }, [])
-  async function loadNFTs() {    
-    const provider = new ethers.providers.JsonRpcProvider(rpcEndpoint)
+  async function loadNFTs() {
+    const provider = new ethers.providers.JsonRpcProvider()
     const tokenContract = new ethers.Contract(nftaddress, NFT.abi, provider)
     const marketContract = new ethers.Contract(nftmarketaddress, Market.abi, provider)
     const data = await marketContract.fetchMarketItems()
-    
+
     const items = await Promise.all(data.map(async i => {
       const tokenUri = await tokenContract.tokenURI(i.tokenId)
       const meta = await axios.get(tokenUri)
       let price = ethers.utils.formatUnits(i.price.toString(), 'ether')
       let item = {
         price,
-        itemId: i.itemId.toNumber(),
+        tokenId: i.tokenId.toNumber(),
         seller: i.seller,
         owner: i.owner,
         image: meta.data.image,
+        music: meta.data.music,
         name: meta.data.name,
         description: meta.data.description,
       }
@@ -53,8 +49,8 @@ export default function Home() {
     const signer = provider.getSigner()
     const contract = new ethers.Contract(nftmarketaddress, Market.abi, signer)
 
-    const price = ethers.utils.parseUnits(nft.price.toString(), 'ether')
-    const transaction = await contract.createMarketSale(nftaddress, nft.itemId, {
+    const price = ethers.utils.parseUnits(nft.price.toString(), 'ether')   
+    const transaction = await contract.sellMarketItem(nftaddress, nft.tokenId, {
       value: price
     })
     await transaction.wait()
@@ -69,6 +65,7 @@ export default function Home() {
             nfts.map((nft, i) => (
               <div key={i} className="border shadow rounded-xl overflow-hidden">
                 <img src={nft.image} />
+                <Music musicsrc={nft.music}/>
                 <div className="p-4">
                   <p style={{ height: '64px' }} className="text-2xl font-semibold">{nft.name}</p>
                   <div style={{ height: '70px', overflow: 'hidden' }}>
